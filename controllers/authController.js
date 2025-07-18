@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const CompanyLocation = require('../models/CompanyLocation');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret';
 
@@ -26,9 +27,12 @@ exports.login = async (req, res) => {
 };
 
 exports.registerHR = async (req, res) => {
-  const { name, email, password, mockPayment } = req.body;
+  const { name, email, password, mockPayment, latitude, longitude } = req.body;
   if (!mockPayment) {
     return res.status(400).json({ message: 'Payment required before registration.' });
+  }
+  if (latitude == null || longitude == null) {
+    return res.status(400).json({ message: 'Company location is required.' });
   }
   try {
     let user = await User.findOne({ email });
@@ -37,6 +41,8 @@ exports.registerHR = async (req, res) => {
     }
     user = new User({ name, email, password, role: 'hr' });
     await user.save();
+    // Save company location
+    await CompanyLocation.create({ latitude, longitude, updatedBy: user._id });
     const token = jwt.sign(
       { userId: user._id, role: user.role, name: user.name, email: user.email },
       JWT_SECRET,

@@ -60,6 +60,13 @@ exports.listUsers = async (req, res) => {
 
 // List workers by HR or department
 exports.listWorkersByHROrDepartment = async (req, res) => {
+  // Aggressive cache prevention
+  res.removeHeader && res.removeHeader('ETag');
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+
   const { hrId, department } = req.query;
   let query = { role: 'worker' };
   if (hrId) query.createdBy = hrId;

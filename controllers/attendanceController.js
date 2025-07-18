@@ -1,12 +1,41 @@
 const Attendance = require('../models/Attendance');
+const CompanyLocation = require('../models/CompanyLocation');
 
-// Worker checks in
+function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // Radius of the earth in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    0.5 - Math.cos(dLat)/2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    (1 - Math.cos(dLon))/2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+// Worker/HR checks in
 exports.checkIn = async (req, res) => {
   const userId = req.user.userId;
   const { location } = req.body;
   const today = new Date();
   today.setHours(0,0,0,0);
   try {
+    // Enforce location radius
+    const companyLoc = await CompanyLocation.findOne().sort({ updatedAt: -1 });
+    if (!companyLoc) {
+      return res.status(400).json({ message: 'Company location not set.' });
+    }
+    if (!location || !location.latitude || !location.longitude) {
+      return res.status(400).json({ message: 'Current location required.' });
+    }
+    const dist = getDistanceFromLatLonInMeters(
+      companyLoc.latitude,
+      companyLoc.longitude,
+      location.latitude,
+      location.longitude
+    );
+    if (dist > 50) {
+      return res.status(403).json({ message: 'You must be within 50 meters of the company location to clock in.' });
+    }
     // Prevent double check-in
     let record = await Attendance.findOne({ worker: userId, date: today });
     if (record && record.checkIn) {
@@ -24,7 +53,7 @@ exports.checkIn = async (req, res) => {
   }
 };
 
-// Worker checks out
+// Worker/HR checks out
 exports.checkOut = async (req, res) => {
   const userId = req.user.userId;
   const today = new Date();
@@ -37,9 +66,31 @@ exports.checkOut = async (req, res) => {
     if (record.checkOut) {
       return res.status(400).json({ message: 'Already checked out today.' });
     }
-    record.checkOut = new Date();
+    // Enforce location radius for check-out as well
+    const companyLoc = await CompanyLocation.findOne().sort({ updatedAt: -1 });
+    if (!companyLoc) {
+      return res.status(400).json({ message: 'Company location not set.' });
+    }
+    const { location } = req.body;
+    if (!location || !location.latitude || !location.longitude) {
+      return res.status(400).json({ message: 'Current location required.' });
+    }
+    const dist = getDistanceFromLatLonInMeters(
+      companyLoc.latitude,
+      companyLoc.longitude,
+      location.latitude,
+      location.longitude
+    );
+    if (dist > 50) {
+      return res.status(403).json({ message: 'You must be within 50 meters of the company location to clock out.' });
+    }
+    const checkInTime = record.checkIn;
+    const checkOutTime = new Date();
+    const hoursWorked = (checkOutTime - checkInTime) / (1000 * 60 * 60); // ms to hours
+    record.checkOut = checkOutTime;
+    record.totalHours = hoursWorked;
     await record.save();
-    res.status(200).json({ message: 'Checked out successfully', attendance: record });
+    res.status(200).json({ message: 'Checked out successfully', attendance: record, totalHours: hoursWorked });
   } catch (err) {
     res.status(500).json({ message: 'Server error' });
   }
