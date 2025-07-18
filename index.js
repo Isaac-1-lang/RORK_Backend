@@ -25,8 +25,8 @@ app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/leave-requests', require('./routes/leaveRequests'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/company-location', require('./routes/companyLocation'));
-app.listen(PORT,()=> {
+app.listen(PORT, '0.0.0.0', () => {
   connectDB();
-  console.log(`The server is running on port ${PORT} `);
-})
+  console.log(`The server is running on port ${PORT} and address 0.0.0.0`);
+});
 

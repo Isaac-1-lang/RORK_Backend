@@ -24,6 +24,9 @@ const AttendanceSchema = new mongoose.Schema({
     enum: ['present', 'absent', 'late', 'on_leave'],
     default: 'present',
   },
+  totalHours: {
+    type: Number, // in hours
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Attendance', AttendanceSchema); 
